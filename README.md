@@ -1,2 +1,2 @@
-# ipl-auction
+index.html
 a game 
