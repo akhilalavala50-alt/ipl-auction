@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPL Mega Auction Simulator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            teko: ['Teko', 'sans-serif'],
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            ipl: {
+              gold: '#F59E0B',
+              goldLight: '#FDE68A',
+              navy: '#0B132B',
+              card: '#111D3B',
+              cardBorder: '#1E2F5B',
+              accent: '#2563EB',
+              sold: '#10B981',
+              unsold: '#EF4444'
+            }
+          },
+          keyframes: {
+            pulseGlow: {
+              '0%, 100%': { boxShadow: '0 0 15px rgba(245, 158, 11, 0.4)' },
+              '50%': { boxShadow: '0 0 30px rgba(245, 158, 11, 0.8)' },
+            },
+            gavelHit: {
+              '0%': { transform: 'rotate(0deg)' },
+              '35%': { transform: 'rotate(-40deg)' },
+              '60%': { transform: 'rotate(15deg)' },
+              '80%': { transform: 'rotate(-5deg)' },
+              '100%': { transform: 'rotate(0deg)' },
+            }
+          },
+          animation: {
+            'glow': 'pulseGlow 2s infinite',
+            'gavel': 'gavelHit 0.5s ease-in-out',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0B132B;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1E2F5B;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3B82F6;
+    }
+    .neon-text {
+      text-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-amber-500 selection:text-black">
+
+  <!-- ================= TOP BROADCAST BAR ================= -->
+  <header class="bg-ipl-navy border-b border-ipl-cardBorder sticky top-0 z-50 shadow-xl backdrop-blur-md bg-opacity-95">
+    <div class="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 font-black text-xl font-teko tracking-wider">
+          IPL
+        </div>
+        <div>
+          <h1 class="text-xl md:text-2xl font-bold font-teko uppercase tracking-wider text-white leading-tight flex items-center gap-2">
+            MEGA AUCTION <span class="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded font-sans font-bold border border-amber-500/30">2026 LIVE</span>
+          </h1>
+          <p class="text-xs text-slate-400 hidden sm:block">Official Franchise Bidding Arena</p>
+        </div>
+      </div>
+
+      <!-- Quick Audio & Fastforward toggles -->
+      <div class="flex items-center gap-3">
+        <button id="soundToggleBtn" onclick="toggleSound()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 transition" title="Toggle Sound FX">
+          <i id="soundIcon" class="ph ph-speaker-high text-lg"></i>
+        </button>
+        <button id="squadModalBtn" onclick="openSquadModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/40 text-blue-300 hover:bg-blue-600/30 text-xs font-semibold tracking-wide transition">
+          <i class="ph ph-users-three text-base"></i>
+          <span>All Squads</span>
+        </button>
+        <button id="endAuctionBtn" onclick="finishAuction()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 text-xs font-semibold tracking-wide transition">
+          <i class="ph ph-trophy text-base"></i>
+          <span class="hidden md:inline">Simulate Season</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTAINER ================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 flex flex-col gap-4">
+
+    <!-- Screen 1: FRANCHISE SELECTOR MODAL (Initial) -->
+    <div id="teamSelectionOverlay" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+      <div class="bg-ipl-card border border-ipl-cardBorder w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="p-6 bg-gradient-to-r from-blue-900/60 via-slate-900 to-amber-950/40 border-b border-ipl-cardBorder text-center">
+          <span class="text-xs font-bold uppercase tracking-widest text-amber-400">Step 1 of 2</span>
+          <h2 class="text-3xl sm:text-4xl font-teko uppercase text-white mt-1">Select Your IPL Franchise</h2>
+          <p class="text-slate-300 text-sm max-w-lg mx-auto">Take full command of the auction paddle. Balance your ₹100 Crore purse, sign 18-25 elite match-winners, and construct an unstoppable championship roster.</p>
+        </div>
+        
+        <div class="p-6 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5" id="teamSelectionGrid">
+          <!-- Populated by JS -->
+        </div>
+
+        <div class="p-4 bg-slate-900 border-t border-ipl-cardBorder flex justify-between items-center text-xs text-slate-400">
+          <span>* Each team starts with ₹100 Cr Purse. Min 18, Max 25 players (Max 8 Overseas).</span>
+          <span class="font-semibold text-amber-400">Rules strictly enforced</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leaderboard / Team Tracker Ribbon -->
+    <div class="bg-ipl-card/90 border border-ipl-cardBorder rounded-xl p-3 shadow-md">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800 text-xs text-slate-400 font-semibold tracking-wider uppercase">
+        <span class="flex items-center gap-1.5"><i class="ph ph-chart-bar text-amber-400"></i> Franchise Purse & Squad Dashboard</span>
+        <span class="text-[11px] text-slate-400">Max 8 Overseas (OS)</span>
+      </div>
+      <div id="teamRibbon" class="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2 mt-2.5">
+        <!-- Live Team Mini Cards generated by JS -->
+      </div>
+    </div>
+
+    <!-- Main Game Grid: Left Player Arena & Right Live Bidding Board -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1">
+      
+      <!-- LEFT: AUCTION PODIUM & PLAYER CARD (7 Cols) -->
+      <div class="lg:col-span-7 flex flex-col gap-4">
+
+        <!-- Stage Card -->
+        <div class="bg-gradient-to-b from-ipl-card to-slate-900 border border-ipl-cardBorder rounded-2xl p-5 shadow-xl relative overflow-hidden flex-1 flex flex-col justify-between">
+          
+          <!-- Background Glow Effect -->
+          <div class="absolute -top-24 -left-24 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="absolute -bottom-24 -right-24 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <!-- Player Header / Set Info -->
+          <div class="flex items-center justify-between z-10">
+            <span id="playerSetBadge" class="bg-slate-800 border border-slate-700 text-slate-300 text-xs px-2.5 py-1 rounded-full font-medium tracking-wide">
+              Set 1: Marquee Batsmen
+            </span>
+            <div class="flex items-center gap-2">
+              <span id="playerCounterBadge" class="text-xs text-slate-400 font-mono">Player 1 / 45</span>
+              <span id="nationalityBadge" class="flex items-center gap-1 text-xs px-2 py-0.5 rounded font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                <i class="ph ph-flag"></i> Indian
+              </span>
+            </div>
+          </div>
+
+          <!-- Main Player Display Profile -->
+          <div class="my-5 flex flex-col sm:flex-row items-center gap-6 z-10">
+            <!-- Avatar / Number Frame -->
+            <div class="relative group">
+              <div id="playerAvatarBox" class="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-800 border-2 border-amber-400/50 flex flex-col items-center justify-center shadow-xl p-2 text-center transition-transform transform group-hover:scale-105">
+                <div id="playerRoleIcon" class="text-4xl text-amber-400 mb-1">
+                  <i class="ph ph-baseball"></i>
+                </div>
+                <span id="playerRatingStars" class="text-amber-400 text-xs tracking-wider">★★★★★</span>
+                <span id="playerTierBadge" class="text-[10px] uppercase font-bold text-slate-400 mt-1">Tier 1 Elite</span>
+              </div>
+              <div id="activeSoldStamp" class="hidden absolute inset-0 bg-emerald-600/90 rounded-2xl flex flex-col items-center justify-center text-white font-teko uppercase text-3xl font-black rotate-[-12deg] shadow-2xl border-2 border-white tracking-widest">
+                <span>SOLD</span>
+                <span id="soldToSubtext" class="text-xs font-sans font-bold -mt-1 tracking-normal">TO MI</span>
+              </div>
+              <div id="activeUnsoldStamp" class="hidden absolute inset-0 bg-red-600/90 rounded-2xl flex flex-col items-center justify-center text-white font-teko uppercase text-3xl font-black rotate-[-12deg] shadow-2xl border-2 border-white tracking-widest">
+                <span>UNSOLD</span>
+              </div>
+            </div>
+
+            <!-- Details & Stats -->
+            <div class="flex-1 text-center sm:text-left">
+              <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                <h2 id="playerName" class="text-3xl sm:text-4xl font-bold font-teko uppercase tracking-wide text-white">Virat Kohli</h2>
+                <span id="playerRole" class="text-xs px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">Top-Order Batter</span>
+              </div>
+              <p id="playerBio" class="text-xs text-slate-400 mb-3 max-w-md">Legendary accumulator with extraordinary chase mastery and IPL record run-scorer.</p>
+
+              <!-- Stat Chips -->
+              <div class="grid grid-cols-3 gap-2 max-w-sm mx-auto sm:mx-0 text-center">
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-1.5">
+                  <span class="block text-[10px] text-slate-400 uppercase font-semibold">Base Price</span>
+                  <span id="playerBasePrice" class="text-sm font-bold text-amber-400 font-mono">₹2.00 Cr</span>
+                </div>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-1.5">
+                  <span class="block text-[10px] text-slate-400 uppercase font-semibold">T20 Avg / SR</span>
+                  <span id="playerPrimaryStat" class="text-sm font-bold text-slate-200 font-mono">38.2 / 138</span>
+                </div>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-1.5">
+                  <span class="block text-[10px] text-slate-400 uppercase font-semibold">Impact Rating</span>
+                  <span id="playerImpactRating" class="text-sm font-bold text-emerald-400 font-mono">96 / 100</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bidder Stage / Spotlight -->
+          <div class="bg-slate-950/80 border border-ipl-cardBorder rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 z-10">
+            <div>
+              <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold block">Current Highest Bid</span>
+              <div class="flex items-baseline gap-2 mt-0.5">
+                <span id="currentBidPrice" class="text-3xl sm:text-4xl font-black font-teko text-amber-400 neon-text">₹2.00 Cr</span>
+                <span id="nextIncrementText" class="text-xs text-slate-400 font-mono">(Next: +₹20L)</span>
+              </div>
+            </div>
+
+            <!-- Holding Franchise Tag -->
+            <div class="flex items-center gap-3">
+              <div class="text-right">
+                <span class="text-[10px] uppercase font-bold text-slate-400">Leading Bidder</span>
+                <div id="leadingTeamName" class="text-base sm:text-lg font-bold font-teko tracking-wide text-white">None</div>
+              </div>
+              <div id="leadingTeamBadge" class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-teko text-xl font-bold text-slate-300">
+                -
+              </div>
+            </div>
+          </div>
+
+          <!-- Auctioneer Hammer & Status Ticker -->
+          <div class="mt-4 pt-3 border-t border-slate-800/80 flex flex-col gap-2 z-10">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div id="gavelIcon" class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg">
+                  <i class="ph ph-gavel"></i>
+                </div>
+                <span id="auctioneerCall" class="text-sm font-semibold tracking-wide text-amber-300">
+                  Auctioneer: "Player open for bids at ₹2.00 Cr..."
+                </span>
+              </div>
+              <!-- Timer / Countdown dots -->
+              <div id="countdownPills" class="flex gap-1.5">
+                <span class="w-3 h-3 rounded-full bg-slate-700" id="pill1"></span>
+                <span class="w-3 h-3 rounded-full bg-slate-700" id="pill2"></span>
+                <span class="w-3 h-3 rounded-full bg-slate-700" id="pill3"></span>
+              </div>
+            </div>
+            
+            <!-- Progress Bar for Hammer Countdown -->
+            <div class="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
+              <div id="countdownProgress" class="bg-gradient-to-r from-amber-500 to-red-500 h-1.5 w-full transition-all duration-300"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- USER ACTION CONTROLS -->
+        <div class="bg-ipl-card border border-ipl-cardBorder rounded-2xl p-4 shadow-lg flex flex-wrap gap-2.5 items-center justify-between">
+          <div class="flex items-center gap-2">
+            <button id="bidBtn" onclick="userPlaceBid()" class="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold font-teko uppercase text-2xl tracking-wider shadow-lg shadow-amber-500/30 transition transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none">
+              <i class="ph ph-hand-palm text-2xl"></i>
+              <span>Raise Paddle (<span id="userNextBidAmount">₹2.20 Cr</span>)</span>
+            </button>
+
+            <button id="passBtn" onclick="userPass()" class="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white font-teko uppercase text-xl font-bold tracking-wider transition">
+              Pass / Hold
+            </button>
+          </div>
+
+          <!-- Speed up / Skip to next -->
+          <div class="flex items-center gap-2 ml-auto">
+            <button id="speedBtn" onclick="toggleSpeed()" class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 hover:border-slate-500 text-xs font-semibold text-slate-300 flex items-center gap-1.5 transition">
+              <i class="ph ph-lightning text-amber-400"></i>
+              <span id="speedBtnText">Speed: 1x</span>
+            </button>
+            <button id="nextPlayerBtn" onclick="forceNextPlayer()" class="px-3 py-2 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/50 text-xs font-semibold text-blue-300 flex items-center gap-1.5 transition">
+              <i class="ph ph-skip-forward"></i>
+              <span>Skip</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: LIVE BIDDING LOG & MY SQUAD SUMMARY (5 Cols) -->
+      <div class="lg:col-span-5 flex flex-col gap-4">
+
+        <!-- User Franchise Summary Card -->
+        <div id="userFranchiseHeader" class="bg-ipl-card border-2 border-amber-500/40 rounded-2xl p-4 shadow-xl relative overflow-hidden">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+              <div id="userTeamLogoBadge" class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 font-teko text-2xl font-black flex items-center justify-center shadow-lg">
+                CSK
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">You are managing</span>
+                <h3 id="userTeamFullName" class="text-xl font-bold font-teko text-white uppercase leading-none">Chennai Super Kings</h3>
+              </div>
+            </div>
+            <button onclick="switchUserTab('squad')" class="text-xs text-amber-400 hover:underline font-semibold">View Full Squad</button>
+          </div>
+
+          <!-- Key Metrics -->
+          <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+            <div class="bg-slate-900/90 rounded-xl p-2 border border-slate-800">
+              <span class="text-[10px] uppercase font-semibold text-slate-400 block">Purse Left</span>
+              <span id="userPurseLeft" class="text-base font-bold text-amber-400 font-mono">₹100.00 Cr</span>
+            </div>
+            <div class="bg-slate-900/90 rounded-xl p-2 border border-slate-800">
+              <span class="text-[10px] uppercase font-semibold text-slate-400 block">Squad Size</span>
+              <span id="userSquadCount" class="text-base font-bold text-white font-mono">0 / 25</span>
+            </div>
+            <div class="bg-slate-900/90 rounded-xl p-2 border border-slate-800">
+              <span class="text-[10px] uppercase font-semibold text-slate-400 block">Overseas</span>
+              <span id="userOverseasCount" class="text-base font-bold text-emerald-400 font-mono">0 / 8</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabbed Container: 1. Live Feed, 2. My Squad Breakdown, 3. Upcoming Sets -->
+        <div class="bg-ipl-card border border-ipl-cardBorder rounded-2xl shadow-xl flex-1 flex flex-col overflow-hidden min-h-[350px]">
+          
+          <div class="flex border-b border-ipl-cardBorder bg-slate-900/60 p-1.5 text-xs font-semibold">
+            <button onclick="switchRightTab('feed')" id="tabBtnFeed" class="flex-1 py-1.5 rounded-lg text-amber-400 bg-slate-800 font-bold transition flex items-center justify-center gap-1.5">
+              <i class="ph ph-broadcast"></i> Live Bids
+            </button>
+            <button onclick="switchRightTab('mysquad')" id="tabBtnSquad" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center justify-center gap-1.5">
+              <i class="ph ph-user-list"></i> My Roster (<span id="userRosterMiniCount">0</span>)
+            </button>
+            <button onclick="switchRightTab('upcoming')" id="tabBtnUpcoming" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center justify-center gap-1.5">
+              <i class="ph ph-queue"></i> Player Pool
+            </button>
+          </div>
+
+          <!-- TAB 1: LIVE BID FEED -->
+          <div id="tabContentFeed" class="flex-1 p-3 overflow-y-auto space-y-2 text-xs flex flex-col-reverse">
+            <!-- Feed items injected dynamically (newest at bottom, auto scroll) -->
+          </div>
+
+          <!-- TAB 2: MY SQUAD QUICK LIST -->
+          <div id="tabContentSquad" class="hidden flex-1 p-3 overflow-y-auto space-y-2">
+            <div id="emptySquadNotice" class="text-center py-10 text-slate-500">
+              <i class="ph ph-empty text-3xl mb-1"></i>
+              <p>No players purchased yet.<br>Raise your paddle when a target player appears!</p>
+            </div>
+            <div id="mySquadList" class="space-y-1.5"></div>
+          </div>
+
+          <!-- TAB 3: UPCOMING PLAYER POOL -->
+          <div id="tabContentUpcoming" class="hidden flex-1 p-3 overflow-y-auto space-y-2">
+            <div id="upcomingPoolList" class="space-y-1.5"></div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- ================= MODAL: ALL SQUADS ROSTER VIEW ================= -->
+  <div id="squadsViewModal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-6">
+    <div class="bg-ipl-card border border-ipl-cardBorder w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-4 bg-slate-900 border-b border-ipl-cardBorder flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="ph ph-shield-check text-amber-400 text-xl"></i>
+          <h3 class="text-xl font-teko uppercase tracking-wider text-white">All Franchise Squads & Budgets</h3>
+        </div>
+        <button onclick="closeSquadModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center">
+          <i class="ph ph-x"></i>
+        </button>
+      </div>
+
+      <div class="p-3 bg-slate-950/60 border-b border-slate-800 flex flex-wrap gap-1.5" id="squadModalTabs">
+        <!-- Team Tabs -->
+      </div>
+
+      <div class="p-4 overflow-y-auto flex-1" id="squadModalContent">
+        <!-- Selected Team's Full Roster Breakdown -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: SEASON TOURNAMENT SIMULATION ================= -->
+  <div id="simulationModal" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-6">
+    <div class="bg-ipl-card border-2 border-amber-500/50 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+      <div class="p-6 bg-gradient-to-r from-amber-600/30 via-slate-900 to-blue-900/40 border-b border-ipl-cardBorder text-center">
+        <div class="w-16 h-16 mx-auto bg-amber-500 text-slate-950 rounded-2xl flex items-center justify-center text-3xl font-black mb-2 shadow-lg shadow-amber-500/20">
+          <i class="ph ph-trophy"></i>
+        </div>
+        <h2 class="text-4xl font-teko uppercase text-white tracking-wider">IPL Season Simulator Results</h2>
+        <p class="text-xs text-slate-300">Squad Balance Ratings, Playoff Qualifications & Championship Outcome</p>
+      </div>
+
+      <div class="p-6 overflow-y-auto flex-1 space-y-6" id="simulationBody">
+        <!-- Filled by JS -->
+      </div>
+
+      <div class="p-4 bg-slate-900 border-t border-ipl-cardBorder flex justify-between items-center">
+        <button onclick="location.reload()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5">
+          <i class="ph ph-arrow-counter-clockwise"></i> Play New Auction
+        </button>
+        <button onclick="closeSimulationModal()" class="px-6 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold font-teko text-xl tracking-wider">
+          Return to Deck
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SOUND SYNTHESIZER (WEB AUDIO API) ================= -->
+  <script>
+    // Audio Context Setup (lazy load on user gesture)
+    let audioCtx = null;
+    let isSoundMuted = false;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function toggleSound() {
+      isSoundMuted = !isSoundMuted;
+      const icon = document.getElementById('soundIcon');
+      if (isSoundMuted) {
+        icon.className = 'ph ph-speaker-slash text-lg text-red-400';
+      } else {
+        icon.className = 'ph ph-speaker-high text-lg text-slate-300';
+        initAudio();
+      }
+    }
+
+    // Gavel hammer sound: low thump + wood resonance
+    function playGavelSound() {
+      if (isSoundMuted) return;
+      initAudio();
+      try {
+        const now = audioCtx.currentTime;
+        // Strike oscillator
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(35, now + 0.15);
+
+        gain.gain.setValueAtTime(0.9, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      } catch(e) {}
+    }
+
+    // Bid Paddle click: crisp upward ping
+    function playBidSound() {
+      if (isSoundMuted) return;
+      initAudio();
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(540, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } catch(e) {}
+    }
+
+    // Sold / Cheer chime
+    function playSoldFanfare() {
+      if (isSoundMuted) return;
+      initAudio();
+      try {
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          const now = audioCtx.currentTime + (idx * 0.08);
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now);
+
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.36);
+        });
+      } catch(e) {}
+    }
+
+    // Unsold buzzer sound
+    function playUnsoldSound() {
+      if (isSoundMuted) return;
+      initAudio();
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(120, now);
+        osc.frequency.setValueAtTime(105, now + 0.15);
+
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.35);
+      } catch(e) {}
+    }
+  </script>
+
+  <!-- ================= GAME LOGIC & ROSTER DATABASE ================= -->
+  <script>
+    /* -------------------------------------------------------------
+       1. FRANCHISE DATABASE
+    ------------------------------------------------------------- */
+    const TEAMS = [
+      { id: 'CSK', name: 'Chennai Super Kings', color: '#FACC15', bg: 'from-yellow-500 to-amber-600', text: 'text-slate-950', badge: 'CSK', needRoles: ['All-rounder', 'Spinner', 'Finisher'] },
+      { id: 'MI', name: 'Mumbai Indians', color: '#2563EB', bg: 'from-blue-600 to-blue-800', text: 'text-white', badge: 'MI', needRoles: ['Fast Bowler', 'Top-Order Batter'] },
+      { id: 'RCB', name: 'Royal Challengers Bengaluru', color: '#DC2626', bg: 'from-red-600 to-red-800', text: 'text-white', badge: 'RCB', needRoles: ['Fast Bowler', 'All-rounder'] },
+      { id: 'KKR', name: 'Kolkata Knight Riders', color: '#7E22CE', bg: 'from-purple-700 to-purple-900', text: 'text-white', badge: 'KKR', needRoles: ['Spinner', 'Top-Order Batter'] },
+      { id: 'SRH', name: 'Sunrisers Hyderabad', color: '#F97316', bg: 'from-orange-500 to-orange-700', text: 'text-white', badge: 'SRH', needRoles: ['Fast Bowler', 'Middle-Order Batter'] },
+      { id: 'RR', name: 'Rajasthan Royals', color: '#EC4899', bg: 'from-pink-600 to-rose-700', text: 'text-white', badge: 'RR', needRoles: ['All-rounder', 'Fast Bowler'] },
+      { id: 'DC', name: 'Delhi Capitals', color: '#0284C7', bg: 'from-sky-600 to-blue-700', text: 'text-white', badge: 'DC', needRoles: ['Wicketkeeper', 'Spinner'] },
+      { id: 'GT', name: 'Gujarat Titans', color: '#0F766E', bg: 'from-teal-700 to-slate-900', text: 'text-white', badge: 'GT', needRoles: ['Top-Order Batter', 'Fast Bowler'] },
+      { id: 'LSG', name: 'Lucknow Super Giants', color: '#06B6D4', bg: 'from-cyan-600 to-blue-800', text: 'text-white', badge: 'LSG', needRoles: ['Wicketkeeper', 'All-rounder'] },
+      { id: 'PBKS', name: 'Punjab Kings', color: '#E11D48', bg: 'from-rose-600 to-red-700', text: 'text-white', badge: 'PBKS', needRoles: ['Top-Order Batter', 'Spinner'] }
+    ];
+
+    /* -------------------------------------------------------------
+       2. PLAYER POOL (Rich, authentic IPL stars with balanced metrics)
+    ------------------------------------------------------------- */
+    const PLAYERS = [
+      // Marquee 1
+      { id: 1, name: 'Virat Kohli', role: 'Top-Order Batter', overseas: false, base: 2.0, rating: 98, bio: 'IPL all-time highest run machine and master chaser.', stat: '38.5 / 134.2', set: 'Marquee 1' },
+      { id: 2, name: 'Rohit Sharma', role: 'Top-Order Batter', overseas: false, base: 2.0, rating: 96, bio: '5-time champion skipper, devastating powerplay opener.', stat: '31.2 / 139.8', set: 'Marquee 1' },
+      { id: 3, name: 'Jasprit Bumrah', role: 'Fast Bowler', overseas: false, base: 2.0, rating: 99, bio: 'The undisputed gold standard death bowler in modern cricket.', stat: '6.45 Econ / 165 Wkts', set: 'Marquee 1' },
+      { id: 4, name: 'Heinrich Klaasen', role: 'Wicketkeeper', overseas: true, base: 2.0, rating: 97, bio: 'The most dangerous spin-destroyer in contemporary T20 cricket.', stat: '172.4 SR / 42.1 Avg', set: 'Marquee 1' },
+      { id: 5, name: 'Pat Cummins', role: 'Fast Bowler', overseas: true, base: 2.0, rating: 95, bio: 'World Cup winning captain and lethal pace strike option.', stat: '8.2 Econ / 152 SR', set: 'Marquee 1' },
+      { id: 6, name: 'Rashid Khan', role: 'Spinner', overseas: true, base: 2.0, rating: 98, bio: 'Premier leg-spinner and high-octane lower-order finisher.', stat: '6.67 Econ / 150 Wkts', set: 'Marquee 1' },
+      
+      // Marquee 2
+      { id: 7, name: 'Travis Head', role: 'Top-Order Batter', overseas: true, base: 2.0, rating: 95, bio: 'Explosive left-hander capable of decimating bowling in 6 overs.', stat: '191.5 SR / 41.3 Avg', set: 'Marquee 2' },
+      { id: 8, name: 'Hardik Pandya', role: 'All-rounder', overseas: false, base: 2.0, rating: 94, bio: 'Clutch seam-bowling all-rounder with tournament pedigree.', stat: '145.2 SR / 53 Wkts', set: 'Marquee 2' },
+      { id: 9, name: 'Mitchell Starc', role: 'Fast Bowler', overseas: true, base: 2.0, rating: 94, bio: 'Toe-crushing left-arm yorker specialist with big playoff records.', stat: '7.8 Econ / 148 Kmph', set: 'Marquee 2' },
+      { id: 10, name: 'Suryakumar Yadav', role: 'Middle-Order Batter', overseas: false, base: 2.0, rating: 98, bio: 'World No. 1 360-degree batter with unbeatable scoring angles.', stat: '171.8 SR / 44.5 Avg', set: 'Marquee 2' },
+      { id: 11, name: 'MS Dhoni', role: 'Wicketkeeper', overseas: false, base: 2.0, rating: 92, bio: 'Unmatched tactical brain, ice-cool nerves and legendary finisher.', stat: '142.5 SR / 250+ Matches', set: 'Marquee 2' },
+      { id: 12, name: 'Rishabh Pant', role: 'Wicketkeeper', overseas: false, base: 2.0, rating: 95, bio: 'Dynamic counter-attacking left-handed keeper captain.', stat: '148.5 SR / 35.8 Avg', set: 'Marquee 2' },
+
+      // Batsmen Set 1
+      { id: 13, name: 'Shubman Gill', role: 'Top-Order Batter', overseas: false, base: 2.0, rating: 94, bio: 'Orange Cap holder with elegant, punishing boundary strokes.', stat: '39.8 / 138.4', set: 'Batsmen 1' },
+      { id: 14, name: 'Rinku Singh', role: 'Middle-Order Batter', overseas: false, base: 1.5, rating: 93, bio: 'The ultimate fearless death-overs finishing phenomenon.', stat: '158.4 SR / 45.2 Avg', set: 'Batsmen 1' },
+      { id: 15, name: 'David Warner', role: 'Top-Order Batter', overseas: true, base: 2.0, rating: 91, bio: 'Three-time Orange Cap winner, 6,500+ IPL runs veteran.', stat: '41.2 / 140.2', set: 'Batsmen 1' },
+      { id: 16, name: 'Yashasvi Jaiswal', role: 'Top-Order Batter', overseas: false, base: 2.0, rating: 95, bio: 'Young fearless opener capable of record 13-ball half centuries.', stat: '164.2 SR / 37.1 Avg', set: 'Batsmen 1' },
+      { id: 17, name: 'Glenn Maxwell', role: 'All-rounder', overseas: true, base: 2.0, rating: 92, bio: 'The Big Show: unorthodox reverse hits and handy off-breaks.', stat: '157.6 SR / 38 Wkts', set: 'All-rounders 1' },
+      { id: 18, name: 'Andre Russell', role: 'All-rounder', overseas: true, base: 2.0, rating: 95, bio: 'Raw muscle, colossal six-hitting monster & death overs bowler.', stat: '174.2 SR / 105 Wkts', set: 'All-rounders 1' },
+
+      // All-Rounders & Spinners
+      { id: 19, name: 'Ravindra Jadeja', role: 'All-rounder', overseas: false, base: 2.0, rating: 94, bio: 'World-class 3D cricketer: gun fielder, tight bowling and finishing.', stat: '7.6 Econ / 156 Wkts', set: 'All-rounders 1' },
+      { id: 20, name: 'Sunil Narine', role: 'All-rounder', overseas: true, base: 2.0, rating: 96, bio: 'MVP opener and mystery spinner with impossible economy rate.', stat: '6.7 Econ / 180 SR', set: 'All-rounders 1' },
+      { id: 21, name: 'Axar Patel', role: 'All-rounder', overseas: false, base: 2.0, rating: 92, bio: 'Reliable left-arm spinner and mature middle-order rescuer.', stat: '7.2 Econ / 135 SR', set: 'All-rounders 1' },
+      { id: 22, name: 'Yuzvendra Chahal', role: 'Spinner', overseas: false, base: 2.0, rating: 94, bio: 'IPL all-time leading wicket-taker and cunning chess-player.', stat: '7.6 Econ / 205 Wkts', set: 'Spinners 1' },
+      { id: 23, name: 'Kuldeep Yadav', role: 'Spinner', overseas: false, base: 2.0, rating: 93, bio: 'Elite wrist-spinner producing unpickable drift and turn.', stat: '7.1 Econ / 82 Wkts', set: 'Spinners 1' },
+      { id: 24, name: 'Varun Chakravarthy', role: 'Spinner', overseas: false, base: 1.5, rating: 90, bio: 'Carrom ball master who freezes power-hitters in tracks.', stat: '7.3 Econ / 68 Wkts', set: 'Spinners 1' },
+
+      // Fast Bowlers
+      { id: 25, name: 'Trent Boult', role: 'Fast Bowler', overseas: true, base: 2.0, rating: 94, bio: 'Deadliest first-over wicket taker with wicked inswingers.', stat: '8.1 Econ / 121 Wkts', set: 'Fast Bowlers 1' },
+      { id: 26, name: 'Kagiso Rabada', role: 'Fast Bowler', overseas: true, base: 2.0, rating: 92, bio: 'Purple Cap winner with genuine 145+ kmph heat.', stat: '8.3 Econ / 117 Wkts', set: 'Fast Bowlers 1' },
+      { id: 27, name: 'Mohammed Shami', role: 'Fast Bowler', overseas: false, base: 2.0, rating: 94, bio: 'Upright seam magician who exploits any hint of early juice.', stat: '8.4 Econ / 127 Wkts', set: 'Fast Bowlers 1' },
+      { id: 28, name: 'Arshdeep Singh', role: 'Fast Bowler', overseas: false, base: 2.0, rating: 93, bio: 'India’s top T20 left-arm death bowling specialist.', stat: '8.5 Econ / 76 Wkts', set: 'Fast Bowlers 1' },
+      { id: 29, name: 'Matheesha Pathirana', role: 'Fast Bowler', overseas: true, base: 2.0, rating: 93, bio: 'Baby Malinga with unplayable 150 kmph slinging yorkers.', stat: '7.7 Econ / 38 Wkts', set: 'Fast Bowlers 1' },
+      { id: 30, name: 'Mayank Yadav', role: 'Fast Bowler', overseas: false, base: 1.0, rating: 90, bio: 'Sensational express pacer clocking 156.7 kmph bullets.', stat: '156.7 Kmph / 6.8 Econ', set: 'Fast Bowlers 1' },
+
+      // Keepers & Value Picks
+      { id: 31, name: 'Nicholas Pooran', role: 'Wicketkeeper', overseas: true, base: 2.0, rating: 94, bio: 'Caribbean six-hitting dynamite in middle overs.', stat: '160.2 SR / 32.5 Avg', set: 'Wicketkeepers 1' },
+      { id: 32, name: 'Sanju Samson', role: 'Wicketkeeper', overseas: false, base: 2.0, rating: 93, bio: 'Effortless ball striker with pristine timing and captaincy skill.', stat: '139.2 SR / 4200 Runs', set: 'Wicketkeepers 1' },
+      { id: 33, name: 'KL Rahul', role: 'Wicketkeeper', overseas: false, base: 2.0, rating: 93, bio: 'Consistently 500+ runs per season anchor and gloveman.', stat: '45.5 Avg / 135 SR', set: 'Wicketkeepers 1' },
+      { id: 34, name: 'Shivam Dube', role: 'All-rounder', overseas: false, base: 1.5, rating: 92, bio: 'Giant spin basher who launches balls into stadium roofs.', stat: '162.5 SR / 72 Sixes', set: 'All-rounders 2' },
+      { id: 35, name: 'Sam Curran', role: 'All-rounder', overseas: true, base: 2.0, rating: 89, bio: 'T20 World Cup Player of the Tournament and clutch all-rounder.', stat: '135 SR / 48 Wkts', set: 'All-rounders 2' },
+      { id: 36, name: 'Ravi Bishnoi', role: 'Spinner', overseas: false, base: 1.5, rating: 90, bio: 'Fast skiddy googly specialist who darts them at batsmen’s pads.', stat: '7.5 Econ / 63 Wkts', set: 'Spinners 2' },
+      { id: 37, name: 'Harshal Patel', role: 'Fast Bowler', overseas: false, base: 1.5, rating: 89, bio: 'Two-time Purple Cap winner with dipping slower off-cutters.', stat: '124 Wkts / 8.6 Econ', set: 'Fast Bowlers 2' },
+      { id: 38, name: 'Tilak Varma', role: 'Middle-Order Batter', overseas: false, base: 1.0, rating: 90, bio: 'Composed left-hander with outstanding game reading.', stat: '144.5 SR / 39.8 Avg', set: 'Batsmen 2' },
+      { id: 39, name: 'Marcus Stoinis', role: 'All-rounder', overseas: true, base: 1.5, rating: 91, bio: 'Hulk-like powerhouse finisher and handy seam bowler.', stat: '150.2 SR / 30 Wkts', set: 'All-rounders 2' },
+      { id: 40, name: 'Lockie Ferguson', role: 'Fast Bowler', overseas: true, base: 1.0, rating: 88, bio: 'Kiwi speedster with blistering bouncers and searing pace.', stat: '152 Kmph / 8.8 Econ', set: 'Fast Bowlers 2' },
+      { id: 41, name: 'Phil Salt', role: 'Wicketkeeper', overseas: true, base: 1.5, rating: 91, bio: 'Fierce English opener with rapid strike-rate at the top.', stat: '175.4 SR / 36.2 Avg', set: 'Wicketkeepers 2' },
+      { id: 42, name: 'Rahul Tewatia', role: 'All-rounder', overseas: false, base: 1.0, rating: 88, bio: 'The Iceman who pulls off impossible final-over miracle heists.', stat: '154.2 SR / Clutch Finisher', set: 'All-rounders 2' },
+      { id: 43, name: 'Nandre Burger', role: 'Fast Bowler', overseas: true, base: 0.75, rating: 87, bio: 'South African tearaway left-armer with steep bounce.', stat: '148 Kmph / 8.2 Econ', set: 'Fast Bowlers 2' },
+      { id: 44, name: 'Ashutosh Sharma', role: 'Middle-Order Batter', overseas: false, base: 0.5, rating: 86, bio: 'Sensational sweep-hitting domestic phenom.', stat: '178 SR / Breakthrough Star', set: 'Batsmen 2' },
+      { id: 45, name: 'Shashank Singh', role: 'Middle-Order Batter', overseas: false, base: 0.5, rating: 86, bio: 'High-impact power hitter with rock solid temperament.', stat: '165 SR / 35.4 Avg', set: 'Batsmen 2' }
+    ];
+
+    /* -------------------------------------------------------------
+       3. STATE MANAGEMENT
+    ------------------------------------------------------------- */
+    let userTeamId = 'CSK';
+    let franchises = {};
+    let currentPlayerIndex = 0;
+    let currentBid = 0;
+    let leadingTeam = null;
+    let hammerStage = 0; // 0 = start, 1 = Going once, 2 = Going twice, 3 = Sold
+    let auctionTimer = null;
+    let gameSpeed = 1000; // ms per tick
+    let speedSetting = 1; // 1x or 2x
+    let isAuctionEnded = false;
+    let aiPassedTeams = new Set();
+
+    // Format currency to Crore / Lakh
+    function formatMoney(amountInCr) {
+      if (amountInCr >= 1.0) {
+        return `₹${amountInCr.toFixed(2)} Cr`;
+      } else {
+        const lakhs = Math.round(amountInCr * 100);
+        return `₹${lakhs} L`;
+      }
+    }
+
+    // Dynamic bid increment rules (IPL style)
+    function getNextIncrement(price) {
+      if (price < 1.0) return 0.10; // +10 Lakh
+      if (price < 2.0) return 0.20; // +20 Lakh
+      if (price < 5.0) return 0.25; // +25 Lakh
+      if (price < 10.0) return 0.50; // +50 Lakh
+      return 1.00; // +1.00 Cr
+    }
+
+    /* -------------------------------------------------------------
+       4. INITIALIZATION
+    ------------------------------------------------------------- */
+    function initGame() {
+      // Initialize team data
+      TEAMS.forEach(t => {
+        franchises[t.id] = {
+          ...t,
+          purse: 100.00, // 100 Crore starting purse
+          squad: [],
+          overseasCount: 0,
+          totalCount: 0
+        };
+      });
+
+      renderTeamSelectionGrid();
+    }
+
+    // Render team select cards
+    function renderTeamSelectionGrid() {
+      const grid = document.getElementById('teamSelectionGrid');
+      grid.innerHTML = '';
+
+      TEAMS.forEach(team => {
+        const card = document.createElement('div');
+        card.className = `p-3 rounded-xl border border-slate-700 bg-gradient-to-b ${team.bg} flex flex-col items-center text-center cursor-pointer hover:scale-105 transition transform shadow-lg group`;
+        card.onclick = () => selectUserTeam(team.id);
+
+        card.innerHTML = `
+          <div class="w-14 h-14 rounded-full bg-slate-950/80 border-2 border-white/40 flex items-center justify-center font-teko text-2xl font-black text-amber-400 group-hover:border-amber-400 transition">
+            ${team.badge}
+          </div>
+          <span class="font-teko uppercase text-xl font-bold tracking-wide mt-2 text-white leading-tight">${team.name}</span>
+          <span class="text-[10px] text-white/80 font-semibold mt-1">₹100 Cr Purse</span>
+          <button class="mt-2.5 w-full py-1 rounded bg-slate-950/70 hover:bg-white hover:text-slate-950 text-white font-teko uppercase text-sm tracking-wider transition">
+            Select
+          </button>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function selectUserTeam(teamId) {
+      userTeamId = teamId;
+      initAudio();
+      document.getElementById('teamSelectionOverlay').classList.add('hidden');
+      updateUserDashboardHeader();
+      renderTeamRibbon();
+      renderUpcomingList();
+      startAuctionForPlayer(0);
+    }
+
+    function updateUserDashboardHeader() {
+      const team = franchises[userTeamId];
+      document.getElementById('userTeamLogoBadge').innerText = team.badge;
+      document.getElementById('userTeamLogoBadge').className = `w-12 h-12 rounded-xl bg-gradient-to-br ${team.bg} ${team.text} font-teko text-2xl font-black flex items-center justify-center shadow-lg border border-white/20`;
+      document.getElementById('userTeamFullName').innerText = team.name;
+      document.getElementById('userPurseLeft').innerText = formatMoney(team.purse);
+      document.getElementById('userSquadCount').innerText = `${team.squad.length} / 25`;
+      document.getElementById('userOverseasCount').innerText = `${team.overseasCount} / 8`;
+      document.getElementById('userRosterMiniCount').innerText = team.squad.length;
+    }
+
+    function renderTeamRibbon() {
+      const ribbon = document.getElementById('teamRibbon');
+      ribbon.innerHTML = '';
+
+      TEAMS.forEach(t => {
+        const team = franchises[t.id];
+        const isUser = (t.id === userTeamId);
+        const box = document.createElement('div');
+        box.className = `p-2 rounded-lg border text-center transition flex flex-col justify-between ${
+          isUser 
+            ? 'bg-amber-500/10 border-amber-500/80 shadow-md ring-1 ring-amber-500' 
+            : 'bg-slate-900/80 border-slate-800'
+        }`;
+
+        box.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-teko font-bold text-sm tracking-wide ${isUser ? 'text-amber-400 font-extrabold' : 'text-slate-300'}">
+              ${team.badge} ${isUser ? '<span class="text-[9px] bg-amber-500 text-slate-950 px-1 rounded font-sans font-bold">YOU</span>' : ''}
+            </span>
+            <span class="text-[10px] text-slate-400 font-mono">${team.squad.length}p</span>
+          </div>
+          <div class="mt-1 flex items-baseline justify-between text-[11px]">
+            <span class="font-bold text-amber-300 font-mono">${formatMoney(team.purse)}</span>
+            <span class="text-[10px] text-emerald-400 font-mono">${team.overseasCount} OS</span>
+          </div>
+        `;
+        ribbon.appendChild(box);
+      });
+    }
+
+    /* -------------------------------------------------------------
+       5. AUCTION STAGE ENGINE
+    ------------------------------------------------------------- */
+    function startAuctionForPlayer(index) {
+      if (index >= PLAYERS.length) {
+        finishAuction();
+        return;
+      }
+
+      currentPlayerIndex = index;
+      const player = PLAYERS[index];
+      currentBid = player.base;
+      leadingTeam = null;
+      hammerStage = 0;
+      aiPassedTeams.clear();
+
+      // Clear stamps
+      document.getElementById('activeSoldStamp').classList.add('hidden');
+      document.getElementById('activeUnsoldStamp').classList.add('hidden');
+
+      // Populate Player Card
+      document.getElementById('playerSetBadge').innerText = player.set;
+      document.getElementById('playerCounterBadge').innerText = `Player ${index + 1} / ${PLAYERS.length}`;
+      
+      const natBadge = document.getElementById('nationalityBadge');
+      if (player.overseas) {
+        natBadge.className = 'flex items-center gap-1 text-xs px-2 py-0.5 rounded font-semibold bg-blue-950 text-blue-400 border border-blue-800';
+        natBadge.innerHTML = `<i class="ph ph-airplane-tilt"></i> Overseas`;
+      } else {
+        natBadge.className = 'flex items-center gap-1 text-xs px-2 py-0.5 rounded font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800';
+        natBadge.innerHTML = `<i class="ph ph-flag"></i> Indian`;
+      }
+
+      document.getElementById('playerName').innerText = player.name;
+      document.getElementById('playerRole').innerText = player.role;
+      document.getElementById('playerBio').innerText = player.bio;
+      document.getElementById('playerBasePrice').innerText = formatMoney(player.base);
+      document.getElementById('playerPrimaryStat').innerText = player.stat;
+      document.getElementById('playerImpactRating').innerText = `${player.rating} / 100`;
+      
+      // Star Icons
+      let stars = '★★★★';
+      if (player.rating >= 95) stars = '★★★★★';
+      else if (player.rating <= 88) stars = '★★★';
+      document.getElementById('playerRatingStars').innerText = stars;
+
+      // Role icon
+      const iconWrap = document.getElementById('playerRoleIcon');
+      if (player.role.includes('Batter')) iconWrap.innerHTML = '<i class="ph ph-baseball"></i>';
+      else if (player.role.includes('Bowler')) iconWrap.innerHTML = '<i class="ph ph-target"></i>';
+      else if (player.role.includes('All-rounder')) iconWrap.innerHTML = '<i class="ph ph-lightning"></i>';
+      else iconWrap.innerHTML = '<i class="ph ph-shield"></i>';
+
+      // Reset Bidding Stage
+      updateBidDisplay();
+      logBidFeed(`--- <strong>${player.name}</strong> (${player.role}, ${player.overseas ? 'OS' : 'IND'}) entered at Base: ${formatMoney(player.base)} ---`, 'announcement');
+      setAuctioneerCall(`Auctioneer: "${player.name} is on the board. Base price is ${formatMoney(player.base)}. Who wants him?"`);
+
+      updateUserBidButton();
+      resetPills();
+      runAuctionClock();
+    }
+
+    function updateBidDisplay() {
+      const nextInc = getNextIncrement(currentBid);
+      const nextTotal = (leadingTeam === null) ? currentBid : (currentBid + nextInc);
+
+      document.getElementById('currentBidPrice').innerText = formatMoney(currentBid);
+      document.getElementById('nextIncrementText').innerText = `(Next: +${formatMoney(nextInc)})`;
+      document.getElementById('userNextBidAmount').innerText = formatMoney(nextTotal);
+
+      const leadName = document.getElementById('leadingTeamName');
+      const leadBadge = document.getElementById('leadingTeamBadge');
+
+      if (leadingTeam) {
+        const teamObj = franchises[leadingTeam];
+        leadName.innerText = teamObj.name;
+        leadName.className = `text-base sm:text-lg font-bold font-teko tracking-wide ${teamObj.id === userTeamId ? 'text-amber-400 font-black' : 'text-white'}`;
+        leadBadge.innerText = teamObj.badge;
+        leadBadge.className = `w-12 h-12 rounded-xl bg-gradient-to-br ${teamObj.bg} ${teamObj.text} border border-white/30 flex items-center justify-center font-teko text-xl font-bold shadow-md`;
+      } else {
+        leadName.innerText = 'No Bids Yet';
+        leadName.className = 'text-base sm:text-lg font-bold font-teko tracking-wide text-slate-400';
+        leadBadge.innerText = '-';
+        leadBadge.className = 'w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-teko text-xl font-bold text-slate-300';
+      }
+
+      updateUserBidButton();
+    }
+
+    function updateUserBidButton() {
+      const btn = document.getElementById('bidBtn');
+      const user = franchises[userTeamId];
+      const player = PLAYERS[currentPlayerIndex];
+      const nextInc = getNextIncrement(currentBid);
+      const nextTotal = (leadingTeam === null) ? currentBid : (currentBid + nextInc);
+
+      // Check restrictions
+      const maxSlotsReached = (user.squad.length >= 25);
+      const overseasFull = (player.overseas && user.overseasCount >= 8);
+      const cannotAfford = (user.purse < nextTotal);
+      const alreadyLeading = (leadingTeam === userTeamId);
+
+      if (alreadyLeading) {
+        btn.disabled = true;
+        btn.classList.add('opacity-50');
+      } else if (cannotAfford || maxSlotsReached || overseasFull) {
+        btn.disabled = true;
+        btn.classList.add('opacity-50');
+      } else {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+      }
+    }
+
+    /* -------------------------------------------------------------
+       6. AI SMART BIDDING LOGIC
+    ------------------------------------------------------------- */
+    function evaluateAIBid() {
+      const player = PLAYERS[currentPlayerIndex];
+      const nextInc = getNextIncrement(currentBid);
+      const nextTotal = (leadingTeam === null) ? currentBid : (currentBid + nextInc);
+
+      // Eligible AI teams
+      const eligibleTeams = TEAMS.filter(t => {
+        if (t.id === userTeamId) return false;
+        if (t.id === leadingTeam) return false;
+        if (aiPassedTeams.has(t.id)) return false;
+
+        const team = franchises[t.id];
+        // Rules
+        if (team.purse < nextTotal) return false;
+        if (team.squad.length >= 25) return false;
+        if (player.overseas && team.overseasCount >= 8) return false;
+        // Keep minimum reserve for mandatory 18 players
+        const neededToReach18 = Math.max(0, 18 - (team.squad.length + 1));
+        const minBudgetNeeded = neededToReach18 * 0.30;
+        if ((team.purse - nextTotal) < minBudgetNeeded) return false;
+
+        return true;
+      });
+
+      if (eligibleTeams.length === 0) return null;
+
+      // Score each team's appetite for this player
+      let bestTeam = null;
+      let highestAppetite = -999;
+
+      eligibleTeams.forEach(t => {
+        const team = franchises[t.id];
+        let appetite = 0;
+
+        // Base appetite proportional to player quality
+        appetite += (player.rating - 80) * 2;
+
+        // Role desire check
+        if (t.needRoles.some(role => player.role.includes(role))) {
+          appetite += 25;
+        }
+
+        // Budget surplus multiplier
+        const purseRatio = team.purse / 100.0;
+        appetite += (purseRatio * 20);
+
+        // Max price this team is willing to pay for this player
+        const maxValuation = (player.rating / 10) * (player.base * 1.5) + (purseRatio * 8);
+
+        if (nextTotal > maxValuation) {
+          aiPassedTeams.add(t.id);
+          return;
+        }
+
+        // Add small random jitter for authentic bidding war
+        appetite += (Math.random() * 20 - 10);
+
+        if (appetite > highestAppetite) {
+          highestAppetite = appetite;
+          bestTeam = t.id;
+        }
+      });
+
+      // Willingness threshold
+      if (highestAppetite > 15 && bestTeam) {
+        return bestTeam;
+      }
+
+      return null;
+    }
+
+    /* -------------------------------------------------------------
+       7. BID DISPATCH & CLOCK TICKING
+    ------------------------------------------------------------- */
+    function placeBid(teamId) {
+      const nextInc = getNextIncrement(currentBid);
+      if (leadingTeam !== null) {
+        currentBid += nextInc;
+      }
+      leadingTeam = teamId;
+      hammerStage = 0; // reset gavel countdown on new bid
+
+      playBidSound();
+      updateBidDisplay();
+
+      const teamObj = franchises[teamId];
+      logBidFeed(`<strong>${teamObj.badge}</strong> raised paddle to <strong>${formatMoney(currentBid)}</strong>`, teamId === userTeamId ? 'user' : 'ai');
+
+      setAuctioneerCall(`Auctioneer: "Bid is ${formatMoney(currentBid)} with ${teamObj.name}!"`);
+      resetPills();
+    }
+
+    function userPlaceBid() {
+      placeBid(userTeamId);
+    }
+
+    function userPass() {
+      logBidFeed(`<strong>You</strong> chose to pass on this round.`, 'info');
+      // accelerate countdown
+      if (hammerStage === 0) hammerStage = 1;
+    }
+
+    function runAuctionClock() {
+      if (auctionTimer) clearInterval(auctionTimer);
+
+      auctionTimer = setInterval(() => {
+        if (isAuctionEnded) return;
+
+        // Try AI bid if hammer not in final strike
+        if (hammerStage < 2) {
+          const aiBidder = evaluateAIBid();
+          if (aiBidder) {
+            placeBid(aiBidder);
+            return;
+          }
+        }
+
+        // Advance hammer stage if nobody bids
+        advanceHammer();
+
+      }, gameSpeed);
+    }
+
+    function advanceHammer() {
+      hammerStage++;
+      triggerGavelShake();
+
+      const player = PLAYERS[currentPlayerIndex];
+
+      if (hammerStage === 1) {
+        document.getElementById('pill1').className = 'w-3 h-3 rounded-full bg-amber-500 animate-pulse';
+        if (leadingTeam) {
+          playGavelSound();
+          setAuctioneerCall(`Auctioneer: "${formatMoney(currentBid)} Going once..."`);
+        } else {
+          setAuctioneerCall(`Auctioneer: "Any interest in ${player.name} at ${formatMoney(player.base)}? Going once..."`);
+        }
+      } else if (hammerStage === 2) {
+        document.getElementById('pill2').className = 'w-3 h-3 rounded-full bg-amber-500 animate-pulse';
+        if (leadingTeam) {
+          playGavelSound();
+          setAuctioneerCall(`Auctioneer: "${formatMoney(currentBid)} Going twice... Last call!"`);
+        } else {
+          setAuctioneerCall(`Auctioneer: "Base price ${formatMoney(player.base)} going twice..."`);
+        }
+      } else if (hammerStage >= 3) {
+        document.getElementById('pill3').className = 'w-3 h-3 rounded-full bg-red-500';
+        clearInterval(auctionTimer);
+        concludePlayerAuction();
+      }
+    }
+
+    function triggerGavelShake() {
+      const g = document.getElementById('gavelIcon');
+      g.classList.remove('animate-gavel');
+      void g.offsetWidth; // re-trigger reflow
+      g.classList.add('animate-gavel');
+    }
+
+    function resetPills() {
+      document.getElementById('pill1').className = 'w-3 h-3 rounded-full bg-slate-700';
+      document.getElementById('pill2').className = 'w-3 h-3 rounded-full bg-slate-700';
+      document.getElementById('pill3').className = 'w-3 h-3 rounded-full bg-slate-700';
+    }
+
+    function setAuctioneerCall(text) {
+      document.getElementById('auctioneerCall').innerText = text;
+    }
+
+    /* -------------------------------------------------------------
+       8. ROUND CONCLUSION (SOLD OR UNSOLD)
+    ------------------------------------------------------------- */
+    function concludePlayerAuction() {
+      const player = PLAYERS[currentPlayerIndex];
+
+      if (leadingTeam) {
+        // Sold!
+        const buyer = franchises[leadingTeam];
+        buyer.purse -= currentBid;
+        buyer.squad.push({
+          ...player,
+          boughtFor: currentBid
+        });
+        buyer.totalCount++;
+        if (player.overseas) buyer.overseasCount++;
+
+        playGavelSound();
+        setTimeout(playSoldFanfare, 120);
+
+        // Show SOLD Stamp
+        const soldStamp = document.getElementById('activeSoldStamp');
+        document.getElementById('soldToSubtext').innerText = `TO ${buyer.badge} FOR ${formatMoney(currentBid)}`;
+        soldStamp.classList.remove('hidden');
+
+        setAuctioneerCall(`🔨 SOLD! ${player.name} goes to ${buyer.name} for ${formatMoney(currentBid)}!`);
+        logBidFeed(`🎉 <strong>SOLD!</strong> ${player.name} acquired by <strong>${buyer.badge}</strong> for <strong>${formatMoney(currentBid)}</strong>`, 'sold');
+
+      } else {
+        // Unsold
+        playGavelSound();
+        setTimeout(playUnsoldSound, 120);
+
+        const unsoldStamp = document.getElementById('activeUnsoldStamp');
+        unsoldStamp.classList.remove('hidden');
+
+        setAuctioneerCall(`❌ UNSOLD! No bids placed for ${player.name}.`);
+        logBidFeed(`❌ <strong>UNSOLD:</strong> ${player.name} went unsold at Base Price ${formatMoney(player.base)}.`, 'unsold');
+      }
+
+      // Update UI components
+      updateUserDashboardHeader();
+      renderTeamRibbon();
+      renderMySquadList();
+      renderUpcomingList();
+
+      // Wait 2.5 seconds, then move to next player
+      setTimeout(() => {
+        startAuctionForPlayer(currentPlayerIndex + 1);
+      }, 2400);
+    }
+
+    function forceNextPlayer() {
+      if (auctionTimer) clearInterval(auctionTimer);
+      concludePlayerAuction();
+    }
+
+    function toggleSpeed() {
+      if (speedSetting === 1) {
+        speedSetting = 2;
+        gameSpeed = 450;
+        document.getElementById('speedBtnText').innerText = 'Speed: 2x';
+        document.getElementById('speedBtn').classList.add('border-amber-500', 'text-amber-400');
+      } else {
+        speedSetting = 1;
+        gameSpeed = 1000;
+        document.getElementById('speedBtnText').innerText = 'Speed: 1x';
+        document.getElementById('speedBtn').classList.remove('border-amber-500', 'text-amber-400');
+      }
+      runAuctionClock();
+    }
+
+    /* -------------------------------------------------------------
+       9. LIVE FEED & ROSTER RENDERING
+    ------------------------------------------------------------- */
+    function logBidFeed(message, type = 'normal') {
+      const feed = document.getElementById('tabContentFeed');
+      const item = document.createElement('div');
+      
+      let style = 'bg-slate-900/60 border-slate-800 text-slate-300';
+      if (type === 'user') style = 'bg-amber-500/10 border-amber-500/40 text-amber-300 font-semibold';
+      else if (type === 'ai') style = 'bg-blue-950/40 border-blue-800/40 text-blue-200';
+      else if (type === 'sold') style = 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 font-bold';
+      else if (type === 'unsold') style = 'bg-red-950/60 border-red-800/50 text-red-300';
+      else if (type === 'announcement') style = 'bg-slate-800 border-slate-700 text-amber-400 text-[11px] font-mono text-center';
+
+      item.className = `p-2 rounded-lg border text-xs leading-relaxed ${style} transition`;
+      item.innerHTML = message;
+
+      feed.prepend(item);
+
+      // Keep maximum 40 messages to maintain speed
+      if (feed.children.length > 40) {
+        feed.removeChild(feed.lastChild);
+      }
+    }
+
+    function renderMySquadList() {
+      const user = franchises[userTeamId];
+      const list = document.getElementById('mySquadList');
+      const empty = document.getElementById('emptySquadNotice');
+
+      if (user.squad.length === 0) {
+        empty.classList.remove('hidden');
+        list.innerHTML = '';
+        return;
+      }
+      empty.classList.add('hidden');
+      list.innerHTML = '';
+
+      user.squad.forEach((p, idx) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-900/90 border border-slate-800 text-xs';
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-mono text-[10px]">${idx + 1}</span>
+            <div>
+              <span class="font-bold text-white font-sans">${p.name}</span>
+              <span class="text-[10px] text-slate-400 block">${p.role} ${p.overseas ? '• (OS)' : ''}</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="font-bold text-amber-400 font-mono">${formatMoney(p.boughtFor)}</span>
+            <span class="text-[10px] text-emerald-400 block">${p.rating} OVR</span>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+    }
+
+    function renderUpcomingList() {
+      const container = document.getElementById('upcomingPoolList');
+      container.innerHTML = '';
+
+      const remaining = PLAYERS.slice(currentPlayerIndex + 1);
+      if (remaining.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">No more players in this pool!</p>';
+        return;
+      }
+
+      remaining.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-900/70 border border-slate-800/80 text-xs';
+        item.innerHTML = `
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="font-semibold text-slate-200">${p.name}</span>
+              ${p.overseas ? '<span class="text-[9px] px-1 bg-blue-950 text-blue-400 rounded border border-blue-900">OS</span>' : ''}
+            </div>
+            <span class="text-[10px] text-slate-400">${p.role} • ${p.set}</span>
+          </div>
+          <div class="text-right">
+            <span class="font-mono text-amber-300 font-bold">${formatMoney(p.base)}</span>
+            <span class="text-[10px] text-slate-400 block">Rating: ${p.rating}</span>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function switchRightTab(tabKey) {
+      document.getElementById('tabContentFeed').classList.add('hidden');
+      document.getElementById('tabContentSquad').classList.add('hidden');
+      document.getElementById('tabContentUpcoming').classList.add('hidden');
+
+      document.getElementById('tabBtnFeed').className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center justify-center gap-1.5';
+      document.getElementById('tabBtnSquad').className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center justify-center gap-1.5';
+      document.getElementById('tabBtnUpcoming').className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center justify-center gap-1.5';
+
+      if (tabKey === 'feed') {
+        document.getElementById('tabContentFeed').classList.remove('hidden');
+        document.getElementById('tabBtnFeed').className = 'flex-1 py-1.5 rounded-lg text-amber-400 bg-slate-800 font-bold transition flex items-center justify-center gap-1.5';
+      } else if (tabKey === 'mysquad') {
+        document.getElementById('tabContentSquad').classList.remove('hidden');
+        document.getElementById('tabBtnSquad').className = 'flex-1 py-1.5 rounded-lg text-amber-400 bg-slate-800 font-bold transition flex items-center justify-center gap-1.5';
+      } else if (tabKey === 'upcoming') {
+        document.getElementById('tabContentUpcoming').classList.remove('hidden');
+        document.getElementById('tabBtnUpcoming').className = 'flex-1 py-1.5 rounded-lg text-amber-400 bg-slate-800 font-bold transition flex items-center justify-center gap-1.5';
+      }
+    }
+
+    /* -------------------------------------------------------------
+       10. ALL SQUADS MODAL
+    ------------------------------------------------------------- */
+    function openSquadModal() {
+      const modal = document.getElementById('squadsViewModal');
+      modal.classList.remove('hidden');
+      renderSquadModalTabs(userTeamId);
+    }
+
+    function closeSquadModal() {
+      document.getElementById('squadsViewModal').classList.add('hidden');
+    }
+
+    function renderSquadModalTabs(activeTeamId) {
+      const tabsWrap = document.getElementById('squadModalTabs');
+      tabsWrap.innerHTML = '';
+
+      TEAMS.forEach(t => {
+        const btn = document.createElement('button');
+        const isActive = (t.id === activeTeamId);
+        btn.className = `px-3 py-1.5 rounded-lg text-xs font-teko text-lg tracking-wider transition ${
+          isActive 
+            ? 'bg-amber-500 text-slate-950 font-bold shadow-md' 
+            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+        }`;
+        btn.innerText = t.badge;
+        btn.onclick = () => renderSquadModalTabs(t.id);
+        tabsWrap.appendChild(btn);
+      });
+
+      renderSquadModalDetails(activeTeamId);
+    }
+
+    function renderSquadModalDetails(teamId) {
+      const team = franchises[teamId];
+      const wrap = document.getElementById('squadModalContent');
+      
+      let playersHtml = '';
+      if (team.squad.length === 0) {
+        playersHtml = `<p class="text-slate-500 text-sm py-8 text-center">No players bought by ${team.name} yet.</p>`;
+      } else {
+        playersHtml = `
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            ${team.squad.map((p, idx) => `
+              <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex justify-between items-center text-xs">
+                <div>
+                  <div class="flex items-center gap-1">
+                    <span class="font-bold text-white">${p.name}</span>
+                    ${p.overseas ? '<span class="text-[9px] px-1 bg-blue-900 text-blue-300 rounded">OS</span>' : ''}
+                  </div>
+                  <span class="text-[10px] text-slate-400">${p.role}</span>
+                </div>
+                <div class="text-right">
+                  <span class="font-bold text-amber-400 font-mono">${formatMoney(p.boughtFor)}</span>
+                  <span class="text-[10px] text-emerald-400 block">${p.rating} OVR</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      wrap.innerHTML = `
+        <div class="p-4 bg-slate-900/80 rounded-xl border border-slate-800 mb-4 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h4 class="text-2xl font-teko uppercase text-white">${team.name}</h4>
+            <span class="text-xs text-slate-400">Total Players: ${team.squad.length} / 25 (Overseas: ${team.overseasCount}/8)</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-slate-400 uppercase block font-semibold">Remaining Purse</span>
+            <span class="text-2xl font-bold font-teko text-amber-400 neon-text">${formatMoney(team.purse)}</span>
+          </div>
+        </div>
+        ${playersHtml}
+      `;
+    }
+
+    /* -------------------------------------------------------------
+       11. ENDGAME: SQUAD RATINGS & TOURNAMENT SIMULATION
+    ------------------------------------------------------------- */
+    function finishAuction() {
+      if (auctionTimer) clearInterval(auctionTimer);
+      isAuctionEnded = true;
+
+      const simModal = document.getElementById('simulationModal');
+      simModal.classList.remove('hidden');
+
+      // Calculate composite ratings for each franchise
+      const teamRatings = TEAMS.map(t => {
+        const team = franchises[t.id];
+        const squad = team.squad;
+
+        // Count balance
+        const bats = squad.filter(p => p.role.includes('Batter'));
+        const bowlers = squad.filter(p => p.role.includes('Bowler'));
+        const allRounders = squad.filter(p => p.role.includes('All-rounder'));
+        const keepers = squad.filter(p => p.role.includes('Wicketkeeper'));
+
+        // Average star rating
+        const avgSkill = squad.length > 0 
+          ? (squad.reduce((sum, p) => sum + p.rating, 0) / squad.length) 
+          : 60;
+
+        // Squad Depth Bonus
+        let balanceScore = 0;
+        if (bats.length >= 4) balanceScore += 15;
+        if (bowlers.length >= 4) balanceScore += 15;
+        if (allRounders.length >= 2) balanceScore += 15;
+        if (keepers.length >= 1) balanceScore += 15;
+        if (squad.length >= 15) balanceScore += 20;
+
+        // Compliance bonus
+        const penalty = (team.overseasCount > 8) ? -30 : 0;
+
+        const totalScore = Math.min(99, Math.round((avgSkill * 0.5) + (balanceScore * 0.45) + penalty));
+
+        return {
+          id: team.id,
+          name: team.name,
+          badge: team.badge,
+          isUser: (team.id === userTeamId),
+          squadCount: squad.length,
+          overseas: team.overseasCount,
+          purseLeft: team.purse,
+          totalScore: Math.max(50, totalScore),
+          wins: 0,
+          points: 0
+        };
+      });
+
+      // Simulate 14 league matches per team based on strength probability
+      teamRatings.forEach(team => {
+        // Base wins correlated with rating (7 to 11 wins typical for top 4)
+        const baseWins = Math.round((team.totalScore - 60) * 0.35 + (Math.random() * 3));
+        team.wins = Math.max(2, Math.min(12, baseWins));
+        team.points = team.wins * 2;
+      });
+
+      // Sort table by points then rating
+      teamRatings.sort((a, b) => (b.points - a.points) || (b.totalScore - a.totalScore));
+
+      const winner = teamRatings[0];
+      const runnerUp = teamRatings[1];
+
+      // Render Simulation Screen
+      const body = document.getElementById('simulationBody');
+      body.innerHTML = `
+        <!-- Champion Announcement Banner -->
+        <div class="p-6 rounded-2xl bg-gradient-to-r from-amber-500/20 via-slate-900 to-amber-600/20 border-2 border-amber-500/60 text-center shadow-xl">
+          <span class="text-xs uppercase tracking-widest text-amber-400 font-bold">IPL Champion Crowned</span>
+          <h3 class="text-4xl font-teko uppercase text-white mt-1">🏆 ${winner.name} Wins IPL 2026!</h3>
+          <p class="text-sm text-slate-300 max-w-md mx-auto mt-1">
+            ${winner.isUser ? 'Outstanding tactical mastery! Your squad dominated the playoffs to hoist the trophy!' : `Defeated ${runnerUp.name} in an electrifying final down to the last over!`}
+          </p>
+        </div>
+
+        <!-- Standings Table -->
+        <div class="bg-slate-900 rounded-xl border border-slate-800 p-4">
+          <h4 class="text-lg font-teko uppercase text-amber-400 mb-2">Final League Standings</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="text-[10px] text-slate-400 uppercase border-b border-slate-800">
+                <tr>
+                  <th class="py-2 px-2">Pos</th>
+                  <th class="py-2 px-2">Franchise</th>
+                  <th class="py-2 px-2">Squad Balance</th>
+                  <th class="py-2 px-2">Pld</th>
+                  <th class="py-2 px-2">Won</th>
+                  <th class="py-2 px-2 text-right">Pts</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800 font-mono">
+                ${teamRatings.map((t, idx) => `
+                  <tr class="${t.isUser ? 'bg-amber-500/10 font-bold text-amber-300' : 'text-slate-300'} ${idx < 4 ? 'border-l-2 border-emerald-500' : ''}">
+                    <td class="py-2 px-2">${idx + 1} ${idx < 4 ? '<span class="text-[9px] text-emerald-400">Q</span>' : ''}</td>
+                    <td class="py-2 px-2 font-sans font-semibold">${t.name} ${t.isUser ? '(YOU)' : ''}</td>
+                    <td class="py-2 px-2 text-amber-400">${t.totalScore} / 100</td>
+                    <td class="py-2 px-2">14</td>
+                    <td class="py-2 px-2">${t.wins}</td>
+                    <td class="py-2 px-2 text-right font-bold ${idx < 4 ? 'text-emerald-400' : 'text-slate-400'}">${t.points}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <span class="text-[10px] text-slate-500 mt-2 block">* Top 4 qualify for Playoffs (Q).</span>
+        </div>
+      `;
+    }
+
+    function closeSimulationModal() {
+      document.getElementById('simulationModal').classList.add('hidden');
+    }
+
+    // Launch initial team selector on DOM load
+    window.onload = function() {
+      initGame();
+    };
+  </script>
+</body>
+</html>
