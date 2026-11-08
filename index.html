@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- FIX 1: Fixes image hotlink 403 blocks so Wikimedia player portraits load cleanly -->
+  <meta name="referrer" content="no-referrer">
   <title>IPL Mega Auction — Live Multiplayer</title>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
@@ -10,7 +12,7 @@
       --gold: #f59e0b;
       --gold-glow: rgba(245, 158, 11, 0.35);
       --electric-blue: #38bdf8;
-      --card-bg: rgba(13, 22, 38, 0.85);
+      --card-bg: rgba(13, 22, 38, 0.88);
       --card-border: rgba(56, 189, 248, 0.22);
       --accent-green: #22c55e;
       --accent-red: #ef4444;
@@ -19,7 +21,6 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     
-    /* Realistic Stadium Night Background */
     body {
       min-height: 100vh;
       color: var(--text-main);
@@ -83,10 +84,9 @@
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
     
-    /* Focused Player Card */
     .player-showcase { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
     .player-photo-wrap {
-      width: 105px; height: 125px; border-radius: 12px; overflow: hidden;
+      width: 110px; height: 130px; border-radius: 12px; overflow: hidden;
       background: #111a2e; border: 2px solid var(--gold);
       box-shadow: 0 0 18px var(--gold-glow);
       flex-shrink: 0;
@@ -131,7 +131,6 @@
       align-items: center;
     }
     
-    /* Single Player Spotlight Banner */
     .spotlight-card {
       background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(13, 22, 38, 0.95));
       border: 1px solid var(--gold);
@@ -149,7 +148,6 @@
     .spotlight-price { font-size: 1.35rem; font-weight: 900; color: var(--accent-green); text-align: right; }
     .spotlight-winner { font-size: 0.82rem; color: var(--electric-blue); font-weight: 700; text-align: right; }
 
-    /* Compact Purses Header Strip */
     .purses-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
     .purse-pill { background: rgba(13, 22, 38, 0.7); border: 1px solid var(--card-border); padding: 8px 12px; border-radius: 8px; text-align: center; }
     .purse-team { font-size: 0.82rem; font-weight: 700; }
@@ -179,7 +177,7 @@
     
     <div class="lobby-row">
       <button class="btn-green" onclick="startHosting()">Host Game (Create Room)</button>
-      <input type="text" id="joinCodeInput" placeholder="Enter Room Code (e.g. ABCD)">
+      <input type="text" id="joinCodeInput" placeholder="Enter Room Code (e.g. 7482)">
       <button class="btn-blue" onclick="joinRoom()">Join Game</button>
     </div>
 
@@ -190,7 +188,6 @@
 
   <div class="ticker" id="liveTicker">Choose your franchise and connect to start the auction.</div>
 
-  <!-- Real-time Compact Team Purses -->
   <div class="purses-strip" id="pursesContainer"></div>
 
   <div class="arena">
@@ -229,7 +226,6 @@
     </div>
   </div>
 
-  <!-- Single Member Won Spotlight (Shown only after a sale) -->
   <div style="font-weight:700; margin-top:6px;">Latest Hammer Result</div>
   <div class="spotlight-card" id="spotlightCard">
     <div class="spotlight-left">
@@ -247,146 +243,38 @@
 </div>
 
 <script>
+  // FIX 2: Google STUN configuration prevents connection failures across different mobile and Wi-Fi networks
+  const PEER_CONFIG = {
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+      ]
+    }
+  };
+
   const PLAYERS = [
-    // --- MARQUEE SET 1: BATTERS & WK ---
     { name: "Virat Kohli", role: "Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Virat_Kohli_during_the_India_vs_Aus_4th_Test_match_at_Narendra_Modi_Stadium_on_09_March_2023.jpg/440px-Virat_Kohli_during_the_India_vs_Aus_4th_Test_match_at_Narendra_Modi_Stadium_on_09_March_2023.jpg" },
     { name: "Rohit Sharma", role: "Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Rohit_Sharma_during_the_India_vs_Australia_4th_Test_match_at_Narendra_Modi_Stadium.jpg/440px-Rohit_Sharma_during_the_India_vs_Australia_4th_Test_match_at_Narendra_Modi_Stadium.jpg" },
+    { name: "Jasprit Bumrah", role: "Fast Bowler", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Jasprit_Bumrah_%283%29.jpg/440px-Jasprit_Bumrah_%283%29.jpg" },
     { name: "Rishabh Pant", role: "Wk-Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Rishabh_Pant_in_2022.jpg/440px-Rishabh_Pant_in_2022.jpg" },
+    { name: "Heinrich Klaasen", role: "Wk-Batter", country: "Overseas (SA)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Heinrich_Klaasen_%28cropped%29.jpg/440px-Heinrich_Klaasen_%28cropped%29.jpg" },
+    { name: "Hardik Pandya", role: "All-Rounder", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Hardik_Pandya_in_2023.jpg/440px-Hardik_Pandya_in_2023.jpg" },
+    { name: "Travis Head", role: "Batter", country: "Overseas (AUS)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Travis_Head_in_2023.jpg/440px-Travis_Head_in_2023.jpg" },
+    { name: "Rashid Khan", role: "Spin Bowler", country: "Overseas (AFG)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Rashid_Khan_2023.jpg/440px-Rashid_Khan_2023.jpg" },
+    { name: "Shubman Gill", role: "Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Shubman_Gill_2023.jpg/440px-Shubman_Gill_2023.jpg" },
+    { name: "Suryakumar Yadav", role: "Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Suryakumar_Yadav_in_2023.jpg/440px-Suryakumar_Yadav_in_2023.jpg" },
     { name: "KL Rahul", role: "Wk-Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/KL_Rahul_during_the_India_vs_Aus_4th_Test_match_at_Narendra_Modi_Stadium.jpg/440px-KL_Rahul_during_the_India_vs_Aus_4th_Test_match_at_Narendra_Modi_Stadium.jpg" },
     { name: "Shreyas Iyer", role: "Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Shreyas_Iyer_2023.jpg/440px-Shreyas_Iyer_2023.jpg" },
-    { name: "Shubman Gill", role: "Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Shubman_Gill_2023.jpg/440px-Shubman_Gill_2023.jpg" },
-    { name: "Yashasvi Jaiswal", role: "Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Yashasvi_Jaiswal_2024.jpg/440px-Yashasvi_Jaiswal_2024.jpg" },
-    { name: "Suryakumar Yadav", role: "Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Suryakumar_Yadav_in_2023.jpg/440px-Suryakumar_Yadav_in_2023.jpg" },
-    { name: "Travis Head", role: "Batter", country: "Overseas (AUS)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Travis_Head_in_2023.jpg/440px-Travis_Head_in_2023.jpg" },
-    { name: "Heinrich Klaasen", role: "Wk-Batter", country: "Overseas (SA)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Heinrich_Klaasen_%28cropped%29.jpg/440px-Heinrich_Klaasen_%28cropped%29.jpg" },
-    { name: "Jos Buttler", role: "Wk-Batter", country: "Overseas (ENG)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/Jos_Buttler_in_2023.jpg/440px-Jos_Buttler_in_2023.jpg" },
-    { name: "Nicholas Pooran", role: "Wk-Batter", country: "Overseas (WI)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Nicholas_Pooran_2023.jpg/440px-Nicholas_Pooran_2023.jpg" },
-
-    // --- MARQUEE SET 2: ALL-ROUNDERS ---
-    { name: "Hardik Pandya", role: "All-Rounder", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Hardik_Pandya_in_2023.jpg/440px-Hardik_Pandya_in_2023.jpg" },
     { name: "Ravindra Jadeja", role: "All-Rounder", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Ravindra_Jadeja_during_the_India_vs_Aus_4th_Test_match_at_Narendra_Modi_Stadium.jpg/440px-Ravindra_Jadeja_during_the_India_vs_Aus_4th_Test_match_at_Narendra_Modi_Stadium.jpg" },
-    { name: "Axar Patel", role: "All-Rounder", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Axar_Patel_in_2023.jpg/440px-Axar_Patel_in_2023.jpg" },
     { name: "Andre Russell", role: "All-Rounder", country: "Overseas (WI)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Andre_Russell_in_2019.jpg/440px-Andre_Russell_in_2019.jpg" },
-    { name: "Glenn Maxwell", role: "All-Rounder", country: "Overseas (AUS)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Glenn_Maxwell_2023.jpg/440px-Glenn_Maxwell_2023.jpg" },
-    { name: "Marcus Stoinis", role: "All-Rounder", country: "Overseas (AUS)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Marcus_Stoinis_2023.jpg/440px-Marcus_Stoinis_2023.jpg" },
-    { name: "Sam Curran", role: "All-Rounder", country: "Overseas (ENG)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Sam_Curran_in_2022.jpg/440px-Sam_Curran_in_2022.jpg" },
-    { name: "Liam Livingstone", role: "All-Rounder", country: "Overseas (ENG)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Liam_Livingstone_2023.jpg/440px-Liam_Livingstone_2023.jpg" },
-    { name: "Mitchell Marsh", role: "All-Rounder", country: "Overseas (AUS)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Mitchell_Marsh_2023.jpg/440px-Mitchell_Marsh_2023.jpg" },
-    { name: "Sunil Narine", role: "All-Rounder", country: "Overseas (WI)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Sunil_Narine_in_2016.jpg/440px-Sunil_Narine_in_2016.jpg" },
-
-    // --- MARQUEE SET 3: FAST BOWLERS ---
-    { name: "Jasprit Bumrah", role: "Fast Bowler", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Jasprit_Bumrah_%283%29.jpg/440px-Jasprit_Bumrah_%283%29.jpg" },
-    { name: "Mohammed Shami", role: "Fast Bowler", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/25/Mohammed_Shami_in_2023.jpg/440px-Mohammed_Shami_in_2023.jpg" },
-    { name: "Mohammed Siraj", role: "Fast Bowler", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Mohammed_Siraj_2023.jpg/440px-Mohammed_Siraj_2023.jpg" },
-    { name: "Arshdeep Singh", role: "Fast Bowler", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Arshdeep_Singh_in_2022.jpg/440px-Arshdeep_Singh_in_2022.jpg" },
     { name: "Pat Cummins", role: "Fast Bowler", country: "Overseas (AUS)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Pat_Cummins_in_2023.jpg/440px-Pat_Cummins_in_2023.jpg" },
     { name: "Mitchell Starc", role: "Fast Bowler", country: "Overseas (AUS)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Mitchell_Starc_2023.jpg/440px-Mitchell_Starc_2023.jpg" },
-    { name: "Kagiso Rabada", role: "Fast Bowler", country: "Overseas (SA)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Kagiso_Rabada_in_2023.jpg/440px-Kagiso_Rabada_in_2023.jpg" },
-    { name: "Trent Boult", role: "Fast Bowler", country: "Overseas (NZ)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Trent_Boult_2023.jpg/440px-Trent_Boult_2023.jpg" },
-    { name: "Anrich Nortje", role: "Fast Bowler", country: "Overseas (SA)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Anrich_Nortje_2023.jpg/440px-Anrich_Nortje_2023.jpg" },
-    { name: "Jofra Archer", role: "Fast Bowler", country: "Overseas (ENG)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Jofra_Archer_2019.jpg/440px-Jofra_Archer_2019.jpg" },
-
-    // --- MARQUEE SET 4: SPINNERS ---
-    { name: "Rashid Khan", role: "Spin Bowler", country: "Overseas (AFG)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Rashid_Khan_2023.jpg/440px-Rashid_Khan_2023.jpg" },
     { name: "Kuldeep Yadav", role: "Spin Bowler", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Kuldeep_Yadav_2023.jpg/440px-Kuldeep_Yadav_2023.jpg" },
     { name: "Yuzvendra Chahal", role: "Spin Bowler", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Yuzvendra_Chahal_2023.jpg/440px-Yuzvendra_Chahal_2023.jpg" },
-    { name: "Ravichandran Ashwin", role: "Spin Bowler", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Ravichandran_Ashwin_2023.jpg/440px-Ravichandran_Ashwin_2023.jpg" },
-    { name: "Wanindu Hasaranga", role: "Spin Bowler", country: "Overseas (SL)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Wanindu_Hasaranga_2023.jpg/440px-Wanindu_Hasaranga_2023.jpg" },
-    { name: "Adam Zampa", role: "Spin Bowler", country: "Overseas (AUS)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Adam_Zampa_2023.jpg/440px-Adam_Zampa_2023.jpg" },
-    { name: "Varun Chakaravarthy", role: "Spin Bowler", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/Varun_Chakaravarthy_2021.jpg/440px-Varun_Chakaravarthy_2021.jpg" },
-    { name: "Ravi Bishnoi", role: "Spin Bowler", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Ravi_Bishnoi_2022.jpg/440px-Ravi_Bishnoi_2022.jpg" },
-
-    // --- INDIAN CORE BATTERS & WK ---
     { name: "Rinku Singh", role: "Batter", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Rinku_Singh_2023.jpg/440px-Rinku_Singh_2023.jpg" },
-    { name: "Ruturaj Gaikwad", role: "Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Ruturaj_Gaikwad_2023.jpg/440px-Ruturaj_Gaikwad_2023.jpg" },
-    { name: "Sanju Samson", role: "Wk-Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Sanju_Samson_2023.jpg/440px-Sanju_Samson_2023.jpg" },
-    { name: "Ishan Kishan", role: "Wk-Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Ishan_Kishan_2023.jpg/440px-Ishan_Kishan_2023.jpg" },
-    { name: "Tilak Varma", role: "Batter", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Tilak_Varma_2023.jpg/440px-Tilak_Varma_2023.jpg" },
-    { name: "Shivam Dube", role: "All-Rounder", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Shivam_Dube_2023.jpg/440px-Shivam_Dube_2023.jpg" },
-    { name: "Sai Sudharsan", role: "Batter", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Sai_Sudharsan_2023.jpg/440px-Sai_Sudharsan_2023.jpg" },
-    { name: "Rajat Patidar", role: "Batter", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Rajat_Patidar_2022.jpg/440px-Rajat_Patidar_2022.jpg" },
-    { name: "Prithvi Shaw", role: "Batter", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Prithvi_Shaw_2018.jpg/440px-Prithvi_Shaw_2018.jpg" },
-    { name: "Devdutt Padikkal", role: "Batter", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Devdutt_Padikkal_2021.jpg/440px-Devdutt_Padikkal_2021.jpg" },
-    { name: "Nitish Rana", role: "Batter", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Nitish_Rana_2021.jpg/440px-Nitish_Rana_2021.jpg" },
-    { name: "Rahul Tripathi", role: "Batter", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Rahul_Tripathi_2023.jpg/440px-Rahul_Tripathi_2023.jpg" },
-    { name: "Abhishek Sharma", role: "All-Rounder", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Abhishek_Sharma_2024.jpg/440px-Abhishek_Sharma_2024.jpg" },
-    { name: "Jitesh Sharma", role: "Wk-Batter", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Jitesh_Sharma_2023.jpg/440px-Jitesh_Sharma_2023.jpg" },
-    { name: "Dhruv Jurel", role: "Wk-Batter", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Dhruv_Jurel_2024.jpg/440px-Dhruv_Jurel_2024.jpg" },
-
-    // --- OVERSEAS POWER HITTERS & FINISHERS ---
-    { name: "David Miller", role: "Batter", country: "Overseas (SA)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/David_Miller_2023.jpg/440px-David_Miller_2023.jpg" },
-    { name: "Shimron Hetmyer", role: "Batter", country: "Overseas (WI)", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Shimron_Hetmyer_2022.jpg/440px-Shimron_Hetmyer_2022.jpg" },
-    { name: "Tim David", role: "Batter", country: "Overseas (AUS)", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Tim_David_2023.jpg/440px-Tim_David_2023.jpg" },
-    { name: "Harry Brook", role: "Batter", country: "Overseas (ENG)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Harry_Brook_2023.jpg/440px-Harry_Brook_2023.jpg" },
-    { name: "Faf du Plessis", role: "Batter", country: "Overseas (SA)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Faf_du_Plessis_2023.jpg/440px-Faf_du_Plessis_2023.jpg" },
-    { name: "David Warner", role: "Batter", country: "Overseas (AUS)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/David_Warner_2023.jpg/440px-David_Warner_2023.jpg" },
-    { name: "Quinton de Kock", role: "Wk-Batter", country: "Overseas (SA)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Quinton_de_Kock_2023.jpg/440px-Quinton_de_Kock_2023.jpg" },
-    { name: "Phil Salt", role: "Wk-Batter", country: "Overseas (ENG)", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Phil_Salt_2023.jpg/440px-Phil_Salt_2023.jpg" },
-    { name: "Jonny Bairstow", role: "Wk-Batter", country: "Overseas (ENG)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Jonny_Bairstow_2023.jpg/440px-Jonny_Bairstow_2023.jpg" },
-    { name: "Rovman Powell", role: "Batter", country: "Overseas (WI)", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Rovman_Powell_2022.jpg/440px-Rovman_Powell_2022.jpg" },
-    { name: "Glenn Phillips", role: "All-Rounder", country: "Overseas (NZ)", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Glenn_Phillips_2023.jpg/440px-Glenn_Phillips_2023.jpg" },
-    { name: "Rachin Ravindra", role: "All-Rounder", country: "Overseas (NZ)", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Rachin_Ravindra_2023.jpg/440px-Rachin_Ravindra_2023.jpg" },
-    { name: "Cameron Green", role: "All-Rounder", country: "Overseas (AUS)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Cameron_Green_2023.jpg/440px-Cameron_Green_2023.jpg" },
-    { name: "Moeen Ali", role: "All-Rounder", country: "Overseas (ENG)", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Moeen_Ali_2023.jpg/440px-Moeen_Ali_2023.jpg" },
-    { name: "Marco Jansen", role: "All-Rounder", country: "Overseas (SA)", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Marco_Jansen_2023.jpg/440px-Marco_Jansen_2023.jpg" },
-
-    // --- INDIAN PACE BATTERY ---
-    { name: "Bhuvneshwar Kumar", role: "Fast Bowler", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Bhuvneshwar_Kumar_2022.jpg/440px-Bhuvneshwar_Kumar_2022.jpg" },
-    { name: "Harshal Patel", role: "Fast Bowler", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Harshal_Patel_2022.jpg/440px-Harshal_Patel_2022.jpg" },
-    { name: "Avesh Khan", role: "Fast Bowler", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Avesh_Khan_2022.jpg/440px-Avesh_Khan_2022.jpg" },
-    { name: "Mukesh Kumar", role: "Fast Bowler", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Mukesh_Kumar_2023.jpg/440px-Mukesh_Kumar_2023.jpg" },
-    { name: "Prasidh Krishna", role: "Fast Bowler", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Prasidh_Krishna_2023.jpg/440px-Prasidh_Krishna_2023.jpg" },
-    { name: "Deepak Chahar", role: "Fast Bowler", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Deepak_Chahar_2022.jpg/440px-Deepak_Chahar_2022.jpg" },
-    { name: "Shardul Thakur", role: "All-Rounder", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Shardul_Thakur_2023.jpg/440px-Shardul_Thakur_2023.jpg" },
-    { name: "Tushar Deshpande", role: "Fast Bowler", country: "India", base: 0.75, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Tushar_Deshpande_2023.jpg/440px-Tushar_Deshpande_2023.jpg" },
-    { name: "Umran Malik", role: "Fast Bowler", country: "India", base: 0.75, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Umran_Malik_2022.jpg/440px-Umran_Malik_2022.jpg" },
-    { name: "Khaleel Ahmed", role: "Fast Bowler", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Khaleel_Ahmed_2019.jpg/440px-Khaleel_Ahmed_2019.jpg" },
-    { name: "Sandeep Sharma", role: "Fast Bowler", country: "India", base: 0.75, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Sandeep_Sharma_2020.jpg/440px-Sandeep_Sharma_2020.jpg" },
-    { name: "Mohit Sharma", role: "Fast Bowler", country: "India", base: 0.75, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Mohit_Sharma_2015.jpg/440px-Mohit_Sharma_2015.jpg" },
-
-    // --- OVERSEAS PACE & SPECIALISTS ---
-    { name: "Josh Hazlewood", role: "Fast Bowler", country: "Overseas (AUS)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Josh_Hazlewood_2023.jpg/440px-Josh_Hazlewood_2023.jpg" },
-    { name: "Lockie Ferguson", role: "Fast Bowler", country: "Overseas (NZ)", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Lockie_Ferguson_2023.jpg/440px-Lockie_Ferguson_2023.jpg" },
-    { name: "Gerald Coetzee", role: "Fast Bowler", country: "Overseas (SA)", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Gerald_Coetzee_2023.jpg/440px-Gerald_Coetzee_2023.jpg" },
-    { name: "Alzarri Joseph", role: "Fast Bowler", country: "Overseas (WI)", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Alzarri_Joseph_2022.jpg/440px-Alzarri_Joseph_2022.jpg" },
-    { name: "Naveen-ul-Haq", role: "Fast Bowler", country: "Overseas (AFG)", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Naveen-ul-Haq_2023.jpg/440px-Naveen-ul-Haq_2023.jpg" },
-    { name: "Fazalhaq Farooqi", role: "Fast Bowler", country: "Overseas (AFG)", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Fazalhaq_Farooqi_2023.jpg/440px-Fazalhaq_Farooqi_2023.jpg" },
-    { name: "Mustafizur Rahman", role: "Fast Bowler", country: "Overseas (BAN)", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Mustafizur_Rahman_2023.jpg/440px-Mustafizur_Rahman_2023.jpg" },
-    { name: "Spencer Johnson", role: "Fast Bowler", country: "Overseas (AUS)", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Spencer_Johnson_2023.jpg/440px-Spencer_Johnson_2023.jpg" },
-    { name: "Nuwan Thushara", role: "Fast Bowler", country: "Overseas (SL)", base: 0.75, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Nuwan_Thushara_2023.jpg/440px-Nuwan_Thushara_2023.jpg" },
-    { name: "Matheesha Pathirana", role: "Fast Bowler", country: "Overseas (SL)", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Matheesha_Pathirana_2023.jpg/440px-Matheesha_Pathirana_2023.jpg" },
-
-    // --- SPIN SPECIALISTS & MYSTERY SPINNERS ---
-    { name: "Noor Ahmad", role: "Spin Bowler", country: "Overseas (AFG)", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Noor_Ahmad_2023.jpg/440px-Noor_Ahmad_2023.jpg" },
-    { name: "Maheesh Theekshana", role: "Spin Bowler", country: "Overseas (SL)", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Maheesh_Theekshana_2023.jpg/440px-Maheesh_Theekshana_2023.jpg" },
-    { name: "Rahul Chahar", role: "Spin Bowler", country: "India", base: 1.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Rahul_Chahar_2021.jpg/440px-Rahul_Chahar_2021.jpg" },
-    { name: "Mayank Markande", role: "Spin Bowler", country: "India", base: 0.75, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Mayank_Markande_2019.jpg/440px-Mayank_Markande_2019.jpg" },
-    { name: "Suyash Sharma", role: "Spin Bowler", country: "India", base: 0.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Suyash_Sharma_2023.jpg/440px-Suyash_Sharma_2023.jpg" },
-    { name: "Krunal Pandya", role: "All-Rounder", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Krunal_Pandya_2021.jpg/440px-Krunal_Pandya_2021.jpg" },
-    { name: "Washington Sundar", role: "All-Rounder", country: "India", base: 1.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Washington_Sundar_2023.jpg/440px-Washington_Sundar_2023.jpg" },
-    { name: "Shahbaz Ahmed", role: "All-Rounder", country: "India", base: 0.75, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Shahbaz_Ahmed_2022.jpg/440px-Shahbaz_Ahmed_2022.jpg" },
-
-    // --- EMERGING STARS & UNCAPPED POWERHOUSES ---
-    { name: "Mayank Yadav", role: "Fast Bowler", country: "India", base: 0.75, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Mayank_Yadav_2024.jpg/440px-Mayank_Yadav_2024.jpg" },
-    { name: "Harshit Rana", role: "Fast Bowler", country: "India", base: 0.75, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Harshit_Rana_2024.jpg/440px-Harshit_Rana_2024.jpg" },
-    { name: "Nitish Kumar Reddy", role: "All-Rounder", country: "India", base: 0.75, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Nitish_Kumar_Reddy_2024.jpg/440px-Nitish_Kumar_Reddy_2024.jpg" },
-    { name: "Shashank Singh", role: "Batter", country: "India", base: 0.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Shashank_Singh_2024.jpg/440px-Shashank_Singh_2024.jpg" },
-    { name: "Ashutosh Sharma", role: "Batter", country: "India", base: 0.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Ashutosh_Sharma_2024.jpg/440px-Ashutosh_Sharma_2024.jpg" },
-    { name: "Abishek Porel", role: "Wk-Batter", country: "India", base: 0.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Abishek_Porel_2023.jpg/440px-Abishek_Porel_2023.jpg" },
-    { name: "Sameer Rizvi", role: "Batter", country: "India", base: 0.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Sameer_Rizvi_2024.jpg/440px-Sameer_Rizvi_2024.jpg" },
-    { name: "Kumar Kushagra", role: "Wk-Batter", country: "India", base: 0.3, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Kumar_Kushagra_2023.jpg/440px-Kumar_Kushagra_2023.jpg" },
-    { name: "Angkrish Raghuvanshi", role: "Batter", country: "India", base: 0.3, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Angkrish_Raghuvanshi_2024.jpg/440px-Angkrish_Raghuvanshi_2024.jpg" },
-    { name: "Vaibhav Arora", role: "Fast Bowler", country: "India", base: 0.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Vaibhav_Arora_2023.jpg/440px-Vaibhav_Arora_2023.jpg" },
-    { name: "Rasikh Salam", role: "Fast Bowler", country: "India", base: 0.3, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Rasikh_Salam_2024.jpg/440px-Rasikh_Salam_2024.jpg" },
-    { name: "Yash Dayal", role: "Fast Bowler", country: "India", base: 0.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Yash_Dayal_2023.jpg/440px-Yash_Dayal_2023.jpg" },
-    { name: "Swapnil Singh", role: "All-Rounder", country: "India", base: 0.3, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Swapnil_Singh_2024.jpg/440px-Swapnil_Singh_2024.jpg" },
-    { name: "Ramandeep Singh", role: "All-Rounder", country: "India", base: 0.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Ramandeep_Singh_2024.jpg/440px-Ramandeep_Singh_2024.jpg" },
-    { name: "Manav Suthar", role: "Spin Bowler", country: "India", base: 0.3, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Manav_Suthar_2023.jpg/440px-Manav_Suthar_2023.jpg" },
-    { name: "Tanush Kotian", role: "Spin Bowler", country: "India", base: 0.3, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Tanush_Kotian_2024.jpg/440px-Tanush_Kotian_2024.jpg" },
-    { name: "Anukul Roy", role: "All-Rounder", country: "India", base: 0.3, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Anukul_Roy_2022.jpg/440px-Anukul_Roy_2022.jpg" },
-    { name: "Nehal Wadhera", role: "Batter", country: "India", base: 0.5, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Nehal_Wadhera_2023.jpg/440px-Nehal_Wadhera_2023.jpg" },
-    { name: "Naman Dhir", role: "All-Rounder", country: "India", base: 0.3, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Naman_Dhir_2024.jpg/440px-Naman_Dhir_2024.jpg" },
-    { name: "Anshul Kamboj", role: "Fast Bowler", country: "India", base: 0.3, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Anshul_Kamboj_2024.jpg/440px-Anshul_Kamboj_2024.jpg" }
+    { name: "Ruturaj Gaikwad", role: "Batter", country: "India", base: 2.0, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Ruturaj_Gaikwad_2023.jpg/440px-Ruturaj_Gaikwad_2023.jpg" }
   ];
 
   let state = {
@@ -432,7 +320,6 @@
       document.getElementById('btnBid1Cr').disabled = !canBid;
     }
 
-    // Render Compact Purses Strip
     const purseContainer = document.getElementById('pursesContainer');
     purseContainer.innerHTML = Object.values(state.teams).map(t => `
       <div class="purse-pill" style="${t.name === myTeam ? 'border-color: var(--gold);' : ''}">
@@ -441,7 +328,6 @@
       </div>
     `).join('');
 
-    // Single Member Sold Spotlight
     if (state.lastSold) {
       document.getElementById('spotlightCard').style.display = 'flex';
       document.getElementById('spotlightName').innerText = state.lastSold.name;
@@ -456,9 +342,9 @@
     isHost = true;
     myTeam = document.getElementById('teamSelect').value;
     const myName = document.getElementById('playerNameInput').value || "Host";
-    const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
 
-    peer = new Peer('ipl-room-' + code);
+    peer = new Peer('ipl-room-' + code, PEER_CONFIG);
 
     peer.on('open', () => {
       document.getElementById('netStatus').innerText = "Hosting Room";
@@ -467,12 +353,20 @@
       document.getElementById('btnStartAuction').style.display = 'block';
       state.teams[myTeam].owner = myName;
       renderUI();
-      document.getElementById('liveTicker').innerText = `Room active! Share room code ${code} with your friends.`;
+      document.getElementById('liveTicker').innerText = `Room active! Share room code ${code} with friends.`;
     });
 
     peer.on('connection', (conn) => {
       connections.push(conn);
       conn.on('data', (data) => handleHostIncomingData(conn, data));
+      conn.on('open', () => {
+        conn.send({ type: 'SYNC', state: state, msg: "Connected to Host!" });
+      });
+    });
+
+    peer.on('error', (err) => {
+      console.error(err);
+      alert("Error starting host: " + err.type);
     });
   }
 
@@ -480,16 +374,18 @@
     isHost = false;
     myTeam = document.getElementById('teamSelect').value;
     const myName = document.getElementById('playerNameInput').value || "Friend";
-    const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+    const code = document.getElementById('joinCodeInput').value.trim();
 
     if (!code) {
-      alert("Please enter the Room Code.");
+      alert("Please enter the 4-digit Room Code.");
       return;
     }
 
-    peer = new Peer();
+    peer = new Peer(PEER_CONFIG);
+    
     peer.on('open', () => {
-      hostConn = peer.connect('ipl-room-' + code);
+      hostConn = peer.connect('ipl-room-' + code, { reliable: true });
+      
       hostConn.on('open', () => {
         document.getElementById('netStatus').innerText = "Connected";
         document.getElementById('liveTicker').innerText = "Connected to room! Waiting for host to start...";
@@ -506,6 +402,11 @@
         }
       });
     });
+
+    peer.on('error', (err) => {
+      console.error(err);
+      alert("Could not connect to room " + code + ". Make sure the Host has clicked 'Host Game' first.");
+    });
   }
 
   function handleHostIncomingData(conn, data) {
@@ -520,12 +421,16 @@
   function broadcastState(msg) {
     renderUI();
     const packet = { type: 'SYNC', state: state, msg: msg };
-    connections.forEach(conn => conn.send(packet));
+    connections.forEach(conn => {
+      if (conn.open) conn.send(packet);
+    });
   }
 
   function broadcastHammer(text) {
     document.getElementById('hammerText').innerText = text;
-    connections.forEach(conn => conn.send({ type: 'HAMMER', text: text }));
+    connections.forEach(conn => {
+      if (conn.open) conn.send({ type: 'HAMMER', text: text });
+    });
   }
 
   function hostStartsGame() {
@@ -539,7 +444,7 @@
     const p = PLAYERS[state.pIdx];
     if (!p) {
       state.inAuction = false;
-      broadcastState("Auction finished! All 100 players processed.");
+      broadcastState("Auction finished! All players processed.");
       return;
     }
     state.curPrice = p.base;
@@ -590,7 +495,6 @@
       const winner = state.teams[state.leader];
       winner.purse = parseFloat((winner.purse - state.curPrice).toFixed(2));
       
-      // Spotlight single player
       state.lastSold = {
         name: p.name,
         price: state.curPrice,
